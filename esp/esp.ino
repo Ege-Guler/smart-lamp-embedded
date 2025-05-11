@@ -70,6 +70,7 @@ void clearEEPROM();
 void blink();
 void reconnect();
 void readMQTTConfig();
+bool syncNTP();
 
 void readMQTTConfig(){
   File file = LittleFS.open("/mqtt.json", "r");
@@ -305,6 +306,27 @@ void startAP()
   Serial.println("HTTP server started (AP mode only)");
 }
 
+bool syncNTP(){
+  configTime(0, 0, "pool.ntp.org", "time.nist.gov"); // UTC, no DST, NTP servers
+  Serial.print("Waiting for NTP time sync... ");
+  time_t now = time(nullptr);
+
+  // Wait until time is reasonably set (e.g., after 2020, epoch 1577836800)
+  while (now < 1577836800)
+  {
+    delay(500);
+    Serial.print(".");
+    now = time(nullptr);
+  }
+  Serial.println(" done.");
+  struct tm timeinfo;
+  gmtime_r(&now, &timeinfo);
+  Serial.print("Current time (UTC): ");
+  Serial.print(asctime(&timeinfo));
+  return true;
+}
+
+
 void connectionLoop()
 {
   WiFi.hostname(ssidAP);
@@ -324,24 +346,11 @@ void connectionLoop()
   if (WiFi.status() == WL_CONNECTED)
   {
     Serial.println("\nConnected! IP: " + WiFi.localIP().toString());
-
-    // NTP Time Sync
-    configTime(0, 0, "pool.ntp.org", "time.nist.gov"); // UTC, no DST, NTP servers
-    Serial.print("Waiting for NTP time sync... ");
-    time_t now = time(nullptr);
-
-    // Wait until time is reasonably set (e.g., after 2020, epoch 1577836800)
-    while (now < 1577836800)
-    {
-      delay(500);
-      Serial.print(".");
-      now = time(nullptr);
+    
+    if(!syncNTP()){
+      Serial.println("NTP sync failed.");
+      return;
     }
-    Serial.println(" done.");
-    struct tm timeinfo;
-    gmtime_r(&now, &timeinfo);
-    Serial.print("Current time (UTC): ");
-    Serial.print(asctime(&timeinfo));
 
     setupMQTT();
     blinker.detach();
