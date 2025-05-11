@@ -52,6 +52,8 @@ static BearSSL::X509List *globalRootCert = nullptr;
 struct WifiConfig config;
 struct MQTTConfig mqttConfig;
 
+static bool isSTA;
+
 // Function prototypes
 bool loadRootCAFromFS();
 void callback(char *topic, byte *payload, unsigned int length);
@@ -236,13 +238,22 @@ void setMode(String mode)
   if (mode == "AP")
   {
     eepromWrite(MOD_ADDR, false);
+    isSTA = false;
   }
   else if (mode == "STA")
   {
     eepromWrite(MOD_ADDR, true);
+    isSTA = true;
   }
   else
     return;
+}
+
+// true STA, false AP
+bool loadMode(){
+  bool mode;
+  eepromRead(MOD_ADDR, mode);
+  return mode;
 }
 
 // write wifi credentials to EEPROM
@@ -314,14 +325,12 @@ void connectionLoop()
   {
     Serial.println("\nConnected! IP: " + WiFi.localIP().toString());
 
-    Serial.println("\nConnected! IP: " + WiFi.localIP().toString());
-
     // NTP Time Sync
     configTime(0, 0, "pool.ntp.org", "time.nist.gov"); // UTC, no DST, NTP servers
     Serial.print("Waiting for NTP time sync... ");
     time_t now = time(nullptr);
+
     // Wait until time is reasonably set (e.g., after 2020, epoch 1577836800)
-    // Or check timeinfo.tm_year > (2020 - 1900)
     while (now < 1577836800)
     {
       delay(500);
@@ -399,6 +408,7 @@ void setup()
   pinMode(RESET_BUTTON_PIN, INPUT_PULLUP);
 
   WiFi.mode(WIFI_AP_STA); // station & ap
+
   // Mount LittleFS
   if (!LittleFS.begin())
   {
@@ -408,10 +418,9 @@ void setup()
 
   loadCredentials();
 
-  // false ap, true sta
-  bool mode;
-  eepromRead(MOD_ADDR, mode);
-  if (mode)
+  // if true -> STA, if false -> AP
+  isSTA = loadMode();
+  if (isSTA)
   {
     connectionLoop();
   }
@@ -426,9 +435,7 @@ void loop()
 
   server.handleClient();
 
-  bool mode;
-  eepromRead(MOD_ADDR, mode);
-  if (mode)
+  if (isSTA)
   {
     reconnect();
   }
