@@ -11,7 +11,6 @@ void eepromWrite(int address, const T& data) {
 
 template <typename T>
 void eepromRead(int address, T& outData) {
-  T data;
   EEPROM.get(address, outData);
 }
 
