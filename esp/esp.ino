@@ -6,7 +6,6 @@
 #include <PubSubClient.h>
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
-#include <DNSServer.h>
 
 #include "EEPROMHelper.h"
 
@@ -19,13 +18,9 @@
 #define WIFI_TIMEOUT 16000
 #define RESET_BUTTON_PIN 0
 
-const byte DNS_PORT = 53;
-
 // Acces Point Configuration
 const char *ssidAP = "h2-smart-lamp";
 const char *passwordAP = "configureme";
-
-IPAddress apIP(172, 217, 28, 1);
 
 bool resetTriggered = false;
 
@@ -52,8 +47,6 @@ Ticker blinker;
 WiFiClientSecure espClient;
 PubSubClient client(espClient);
 
-DNSServer dnsServer;
-
 static BearSSL::X509List *globalRootCert = nullptr;
 
 struct WifiConfig config;
@@ -79,11 +72,9 @@ void reconnect();
 void readMQTTConfig();
 bool syncNTP();
 
-void readMQTTConfig()
-{
+void readMQTTConfig(){
   File file = LittleFS.open("/mqtt.json", "r");
-  if (!file)
-  {
+  if(!file){
     Serial.println("Failed to open mqtt.json");
     return;
   }
@@ -92,8 +83,7 @@ void readMQTTConfig()
   DeserializationError error = deserializeJson(doc, file);
   file.close();
 
-  if (error)
-  {
+  if (error) {
     Serial.println("Failed to parse config file");
     return;
   }
@@ -103,6 +93,7 @@ void readMQTTConfig()
   mqttConfig.mqtt_pass = doc["mqtt_password"].as<String>();
 
   Serial.println("MQTT Config loaded successfully.");
+
 }
 
 bool loadRootCAFromFS()
@@ -260,8 +251,7 @@ void setMode(String mode)
 }
 
 // true STA, false AP
-bool loadMode()
-{
+bool loadMode(){
   bool mode;
   eepromRead(MOD_ADDR, mode);
   return mode;
@@ -302,9 +292,7 @@ String getContentType(String path)
 
 void startAP()
 {
-  WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
   WiFi.softAP(ssidAP, passwordAP);
-  dnsServer.start(DNS_PORT, "*", apIP);
   blinker.attach(0.5, blink);
 
   Serial.println("AP started. IP: " + WiFi.softAPIP().toString());
@@ -312,27 +300,13 @@ void startAP()
   server.on("/submit", handleFormSubmit);
 
   server.onNotFound([]()
-                    {
-  String path = server.uri();
-  if (LittleFS.exists(path)) {
-    handleFileRequest(path);
-  } else {
-    if (LittleFS.exists("/index.html")) {
-      handleFileRequest("/index.html");
-    } else {
-      server.send(200, "text/html", "<html><body><h1>Welcome</h1><p>Captive portal fallback page.</p></body></html>");
-    }
-  } });
-
-  // server.onNotFound([]()
-  //                   { handleFileRequest(server.uri()); });
+                    { handleFileRequest(server.uri()); });
 
   server.begin();
   Serial.println("HTTP server started (AP mode only)");
 }
 
-bool syncNTP()
-{
+bool syncNTP(){
   configTime(0, 0, "pool.ntp.org", "time.nist.gov"); // UTC, no DST, NTP servers
   Serial.print("Waiting for NTP time sync... ");
   time_t now = time(nullptr);
@@ -351,6 +325,7 @@ bool syncNTP()
   Serial.print(asctime(&timeinfo));
   return true;
 }
+
 
 void connectionLoop()
 {
@@ -371,9 +346,8 @@ void connectionLoop()
   if (WiFi.status() == WL_CONNECTED)
   {
     Serial.println("\nConnected! IP: " + WiFi.localIP().toString());
-
-    if (!syncNTP())
-    {
+    
+    if(!syncNTP()){
       Serial.println("NTP sync failed.");
       return;
     }
@@ -468,7 +442,6 @@ void setup()
 void loop()
 {
 
-  dnsServer.processNextRequest();
   server.handleClient();
 
   if (isSTA)
