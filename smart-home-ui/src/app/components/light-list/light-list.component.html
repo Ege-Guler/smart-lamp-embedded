@@ -1,1 +1,18 @@
-<p>light-list works!</p>
+<mat-card>
+  <mat-card-title class="card-title">Light List</mat-card-title>
+  <mat-card-content>
+    <mat-list>
+      <mat-list-item *ngFor="let light of lights">
+        <div class="light-item-container">
+          <span class="light-name">{{ light.name }}</span>
+          <mat-slide-toggle
+            [checked]="light.isOn"
+            (change)="light.isOn = $event.checked"
+            [color]="getToggleColor(light)"
+          ></mat-slide-toggle>
+   
+        </div>
+      </mat-list-item>
+    </mat-list>
+  </mat-card-content>
+</mat-card>
