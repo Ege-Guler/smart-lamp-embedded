@@ -20,6 +20,12 @@
   background-color: white;
   border-radius: 8px;
   border: 1px solid #E5E7EB;
+  transition: box-shadow 0.3s, transform 0.2s;
+  
+  &:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+  }
 }
 
 .light-info {
@@ -50,12 +56,60 @@
   min-width: 200px;
 }
 
+.brightness-indicator {
+  display: inline-block;
+  min-width: 40px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.light-icon {
+  transition: opacity 0.3s;
+}
+
+.brightness-slider {
+  touch-action: none; // Prevent page scrolling when sliding on mobile
+}
+
 ::ng-deep {
   .mat-slider {
-    width: 100px;
+    width: 120px;
+    transition: opacity 0.3s;
+    
+    // Increase the vertical click/touch area
+    height: 48px;
+    
+    .mdc-slider__thumb {
+      transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      
+      &:hover, &:active {
+        transform: scale(1.2);
+      }
+    }
+    
+    .mdc-slider__track--active {
+      transition: background-color 0.3s;
+    }
+    
+    // Provide focus styling for accessibility
+    &:focus-within {
+      .mdc-slider__thumb {
+        transform: scale(1.15);
+      }
+    }
   }
   
   .mat-slide-toggle {
     margin-left: 8px;
+    
+    .mdc-switch__thumb {
+      transition: transform 0.2s;
+      
+      &:hover {
+        transform: scale(1.1);
+      }
+    }
   }
 }

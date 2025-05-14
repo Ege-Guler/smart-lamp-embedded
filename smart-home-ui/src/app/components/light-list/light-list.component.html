@@ -4,23 +4,34 @@
   </mat-card-header>
   <mat-card-content>
     <div class="lights-list">
-      <div class="light-item" *ngFor="let light of lights">
+      <div class="light-item" *ngFor="let light of lights" [style.border-left]="'4px solid ' + light.color">
         <div class="light-info">
-          <mat-icon [style.color]="light.color">lightbulb</mat-icon>
+          <mat-icon [style.color]="light.color" [class.light-icon]="true"
+                    [style.opacity]="light.isOn ? (light.brightness / 100) + 0.3 : 0.3">
+            lightbulb
+          </mat-icon>
           <div class="light-details">
             <span class="light-name">{{ light.name }}</span>
             <span class="light-location">{{ light.location }}</span>
           </div>
         </div>
         <div class="light-controls">
-          <mat-slider
+          <mat-slider 
+            class="brightness-slider"
             [disabled]="!light.isOn"
-            [min]="0"
-            [max]="100"
-            [step]="1"
-            [(ngModel)]="light.brightness"
-            (input)="onBrightnessChange(light)">
+            [style.opacity]="light.isOn ? 1 : 0.5"
+            [color]="light.isOn ? 'primary' : 'accent'">
+            <input matSliderThumb 
+                  [min]="0" 
+                  [max]="100" 
+                  [step]="1" 
+                  [(ngModel)]="light.brightness" 
+                  (input)="onSliderInput(light)" 
+                  (change)="onBrightnessChange(light)" />
           </mat-slider>
+          <div class="brightness-indicator" [style.color]="light.isOn ? light.color : '#6B7280'">
+            {{ light.brightness }}%
+          </div>
           <mat-slide-toggle
             name="toggle-{{light.id}}"
             [(ngModel)]="light.isOn"
