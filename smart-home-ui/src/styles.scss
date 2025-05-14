@@ -26,3 +26,15 @@ $work-icon: #10B981;
 
 html, body { height: 100%; }
 body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+
+// Force repaint class
+.force-repaint {
+  transform: translateZ(0);
+  animation-duration: 0.001s;
+  animation-name: force-repaint;
+}
+
+@keyframes force-repaint {
+  from { opacity: 0.99; }
+  to { opacity: 1; }
+}

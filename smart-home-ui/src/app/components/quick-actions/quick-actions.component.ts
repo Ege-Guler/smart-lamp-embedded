@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, Renderer2, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -47,12 +47,27 @@ export class QuickActionsComponent {
     }
   ];
 
-  constructor(private lightService: LightService) {}
+  constructor(
+    private lightService: LightService,
+    private renderer: Renderer2,
+    private el: ElementRef
+  ) {}
 
   onActionClick(action: any): void {
     console.log('Action clicked:', action.label);
     if (action.label === 'All Off') {
       this.lightService.turnOffAllLights();
+      
+      // Force a repaint by temporarily adding and removing a class
+      const body = document.body;
+      body.classList.add('force-repaint');
+      
+      // Use requestAnimationFrame to ensure changes are applied in the next frame
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          body.classList.remove('force-repaint');
+        });
+      });
     }
     // Other actions can be implemented here
   }

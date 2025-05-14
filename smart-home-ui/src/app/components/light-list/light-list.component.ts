@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
@@ -24,15 +24,12 @@ import { LightService, Light } from '../../services/light.service';
 export class LightListComponent implements OnInit {
   lights: Light[] = [];
 
-  constructor(
-    private lightService: LightService,
-    private cdr: ChangeDetectorRef
-  ) {}
+  constructor(private lightService: LightService) {}
 
   ngOnInit() {
     this.lightService.lights$.subscribe(lights => {
       this.lights = lights;
-      this.cdr.detectChanges(); // Force change detection after state update
+      setTimeout(() => {}, 0); // Defer change detection to the next event loop
     });
   }
 
