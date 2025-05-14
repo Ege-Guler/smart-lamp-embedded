@@ -1,1 +1,18 @@
-<p>quick-actions works!</p>
+<mat-card class="actions-card">
+  <mat-card-header>
+    <mat-card-title>Quick Actions</mat-card-title>
+  </mat-card-header>
+  <mat-card-content>
+    <div class="actions-grid">
+      <button mat-button
+              *ngFor="let action of actions"
+              class="action-button"
+              [style.background-color]="action.color + '20'"
+              [matTooltip]="action.tooltip"
+              (click)="onActionClick(action)">
+        <mat-icon [style.color]="action.color">{{ action.icon }}</mat-icon>
+        <span>{{ action.label }}</span>
+      </button>
+    </div>
+  </mat-card-content>
+</mat-card>

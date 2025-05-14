@@ -1,1 +1,34 @@
-<p>light-list works!</p>
+<mat-card class="lights-card">
+  <mat-card-header>
+    <mat-card-title>Smart Lights</mat-card-title>
+  </mat-card-header>
+  <mat-card-content>
+    <div class="lights-list">
+      <div class="light-item" *ngFor="let light of lights">
+        <div class="light-info">
+          <mat-icon [style.color]="light.color">lightbulb</mat-icon>
+          <div class="light-details">
+            <span class="light-name">{{ light.name }}</span>
+            <span class="light-location">{{ light.location }}</span>
+          </div>
+        </div>
+        <div class="light-controls">
+          <mat-slider
+            [disabled]="!light.isOn"
+            [min]="0"
+            [max]="100"
+            [step]="1"
+            [(ngModel)]="light.brightness"
+            (input)="onBrightnessChange(light)">
+          </mat-slider>
+          <mat-slide-toggle
+            name="toggle-{{light.id}}"
+            [(ngModel)]="light.isOn"
+            (ngModelChange)="onToggleChange(light)"
+            [color]="light.color">
+          </mat-slide-toggle>
+        </div>
+      </div>
+    </div>
+  </mat-card-content>
+</mat-card>

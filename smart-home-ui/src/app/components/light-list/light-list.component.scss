@@ -1,0 +1,61 @@
+.lights-card {
+  background-color: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.lights-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.light-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background-color: white;
+  border-radius: 8px;
+  border: 1px solid #E5E7EB;
+}
+
+.light-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.light-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.light-name {
+  color: #111827;
+  font-weight: 500;
+}
+
+.light-location {
+  color: #6B7280;
+  font-size: 14px;
+}
+
+.light-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 200px;
+}
+
+::ng-deep {
+  .mat-slider {
+    width: 100px;
+  }
+  
+  .mat-slide-toggle {
+    margin-left: 8px;
+  }
+}
