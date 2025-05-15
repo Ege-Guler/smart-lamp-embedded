@@ -2,6 +2,31 @@
 
 This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 19.2.8.
 
+## Environment Configuration
+
+For security reasons, environment files containing sensitive information (like API credentials) are not committed to the repository. Before running the application, you'll need to set up your environment:
+
+1. Create a file `src/environments/environment.ts` based on the example template:
+   ```bash
+   cp src/environments/environment.example.ts src/environments/environment.ts
+   ```
+
+2. Edit `environment.ts` and populate it with your actual credentials:
+   ```typescript
+   export const environment = {
+     production: false,
+     mqtt: {
+       host: 'your-mqtt-broker-host',
+       port: 8884,
+       protocol: 'wss',
+       path: '/mqtt',
+       username: 'your-username',
+       password: 'your-password',
+       clientId: 'smart-home-ui-' + Math.random().toString(16).substring(2, 8)
+     }
+   };
+   ```
+
 ## Development server
 
 To start a local development server, run:
