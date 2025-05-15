@@ -1,0 +1,18 @@
+<mat-card class="status-card">
+  <mat-card-header>
+    <mat-card-title>System Status</mat-card-title>
+  </mat-card-header>
+  <mat-card-content>
+    <div class="status-grid">
+      <div class="status-item" *ngFor="let status of statusItems">
+        <mat-icon [class]="status.iconClass" [matTooltip]="status.tooltip">
+          {{ status.icon }}
+        </mat-icon>
+        <span class="status-label">{{ status.label }}</span>
+        <span class="status-value" [class]="status.valueClass">
+          {{ status.value }}
+        </span>
+      </div>
+    </div>
+  </mat-card-content>
+</mat-card>

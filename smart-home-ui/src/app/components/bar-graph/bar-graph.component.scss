@@ -1,0 +1,19 @@
+.chart-card {
+  background-color: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.chart-container {
+  height: 300px;
+  margin-top: 16px;
+}
+
+::ng-deep {
+  .ngx-charts {
+    text {
+      fill: #6B7280;
+    }
+  }
+}
