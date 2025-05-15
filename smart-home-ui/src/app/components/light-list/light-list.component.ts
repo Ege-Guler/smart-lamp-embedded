@@ -6,6 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSliderModule } from '@angular/material/slider';
 import { FormsModule } from '@angular/forms';
 import { LightService, Light } from '../../services/light.service';
+import { ColorPickerDialogComponent } from '../color-picker-dialog/color-picker-dialog.component';
 
 @Component({
   selector: 'app-light-list',
@@ -16,15 +17,20 @@ import { LightService, Light } from '../../services/light.service';
     MatSlideToggleModule,
     MatIconModule,
     MatSliderModule,
-    FormsModule
+    FormsModule,
+    ColorPickerDialogComponent
   ],
   templateUrl: './light-list.component.html',
   styleUrls: ['./light-list.component.scss']
 })
 export class LightListComponent implements OnInit {
   lights: Light[] = [];
-
-  constructor(private lightService: LightService) {}
+  displayColorPicker = false;
+  selectedLight: Light | null = null;
+  
+  constructor(
+    private lightService: LightService
+  ) {}
 
   ngOnInit() {
     this.lightService.lights$.subscribe(lights => {
@@ -49,7 +55,8 @@ export class LightListComponent implements OnInit {
     
     console.log(`${light.name} toggled to ${light.isOn}`);
   }
-
+  
+  // This method handles live slider movement
   onSliderInput(light: Light): void {
     // Visual feedback during sliding
     console.log(`${light.name} brightness sliding to ${light.brightness}`);
@@ -68,6 +75,31 @@ export class LightListComponent implements OnInit {
     if (window.navigator && window.navigator.vibrate) {
       window.navigator.vibrate(10); // Very short vibration for subtle feedback
     }
+  }
+  
+  openColorPicker(light: Light): void {
+    if (!light.isOn) return; // Don't open color picker if light is off
+    
+    this.selectedLight = light;
+    this.displayColorPicker = true;
+  }
+  
+  onColorPickerHide(): void {
+    this.displayColorPicker = false;
+  }
+  
+  onColorSelected(color: string): void {
+    if (this.selectedLight) {
+      const updatedLight = { ...this.selectedLight, color: color };
+      this.lightService.updateLight(updatedLight);
+      console.log(`${this.selectedLight.name} color changed to ${color}`);
+      
+      // Provide tactile feedback if available
+      if (window.navigator && window.navigator.vibrate) {
+        window.navigator.vibrate(20); // Short vibration for feedback
+      }
+    }
+    this.selectedLight = null;
   }
   
   // Get brightness-based color for visual feedback

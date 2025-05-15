@@ -1,0 +1,31 @@
+<p-dialog 
+  [(visible)]="visible" 
+  [modal]="true" 
+  [style]="{ width: '340px' }" 
+  [header]="'Change ' + lightName + ' Color'"
+  [draggable]="false" 
+  [resizable]="false"
+  styleClass="solid-bg-dialog"
+  (onHide)="onHide()">
+  
+  <div class="color-picker-content">
+    <div class="color-preview">
+      <div class="color-box" [style.background-color]="selectedColor">
+        <span class="color-value">{{ selectedColor }}</span>
+      </div>
+    </div>
+    
+    <div class="color-picker-container">
+      <p-colorPicker 
+        [(ngModel)]="selectedColor" 
+        [inline]="true"
+        (onChange)="onColorChange($event)">
+      </p-colorPicker>
+    </div>
+  </div>
+  
+  <ng-template pTemplate="footer">
+    <button pButton label="Cancel" class="p-button-text" (click)="onCancel()"></button>
+    <button pButton label="Apply" class="p-button-primary" (click)="onApply()"></button>
+  </ng-template>
+</p-dialog>

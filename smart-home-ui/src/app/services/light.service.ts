@@ -65,8 +65,19 @@ export class LightService {
     this.mqttService.publishMessage(`lights/${updatedLight.id}/command`, JSON.stringify({
       isOn: updatedLight.isOn,
       brightness: updatedLight.brightness,
+      color: updatedLight.color,
       timestamp: new Date().toISOString()
     }));
+  }
+
+  // Convert hex color to RGB values for MQTT
+  private hexToRgb(hex: string): { r: number, g: number, b: number } | null {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16)
+    } : null;
   }
 
   private updateLightFromMqtt(lightId: string, payload: any): void {
@@ -76,7 +87,8 @@ export class LightService {
         return {
           ...light,
           isOn: payload.isOn !== undefined ? payload.isOn : light.isOn,
-          brightness: payload.brightness !== undefined ? payload.brightness : light.brightness
+          brightness: payload.brightness !== undefined ? payload.brightness : light.brightness,
+          color: payload.color !== undefined ? payload.color : light.color
         };
       }
       return light;

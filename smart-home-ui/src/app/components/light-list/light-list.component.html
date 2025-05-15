@@ -6,10 +6,13 @@
     <div class="lights-list">
       <div class="light-item" *ngFor="let light of lights" [style.border-left]="'4px solid ' + light.color">
         <div class="light-info">
-          <mat-icon [style.color]="light.color" [class.light-icon]="true"
-                    [style.opacity]="light.isOn ? (light.brightness / 100) + 0.3 : 0.3">
-            lightbulb
-          </mat-icon>
+          <div class="light-icon-wrapper" (click)="openColorPicker(light)">
+            <mat-icon [style.color]="light.color" [class.light-icon]="true"
+                      [style.opacity]="light.isOn ? (light.brightness / 100) + 0.3 : 0.3">
+              lightbulb
+            </mat-icon>
+            <div class="color-indicator" [style.background-color]="light.color"></div>
+          </div>
           <div class="light-details">
             <span class="light-name">{{ light.name }}</span>
             <span class="light-location">{{ light.location }}</span>
@@ -43,3 +46,12 @@
     </div>
   </mat-card-content>
 </mat-card>
+
+<!-- PrimeNG Color Picker Dialog -->
+<app-color-picker-dialog
+  [visible]="displayColorPicker"
+  [lightName]="selectedLight?.name || ''"
+  [initialColor]="selectedLight?.color || '#FFFFFF'"
+  (hideDialog)="onColorPickerHide()"
+  (colorSelected)="onColorSelected($event)">
+</app-color-picker-dialog>

@@ -38,3 +38,22 @@ body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
   from { opacity: 0.99; }
   to { opacity: 1; }
 }
+
+// PrimeNG global overrides
+.p-dialog {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+  background-color: white !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}
+
+.p-dialog .p-dialog-header, 
+.p-dialog .p-dialog-content, 
+.p-dialog .p-dialog-footer {
+  background-color: white !important;
+  opacity: 1 !important;
+}
+
+.p-dialog-mask.p-component-overlay {
+  background-color: rgba(0, 0, 0, 0.6) !important;
+}

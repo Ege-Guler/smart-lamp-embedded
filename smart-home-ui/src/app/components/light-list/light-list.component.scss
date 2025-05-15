@@ -34,6 +34,32 @@
   gap: 12px;
 }
 
+.light-icon-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    background-color: rgba(0,0,0,0.05);
+  }
+}
+
+.color-indicator {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
 .light-details {
   display: flex;
   flex-direction: column;
@@ -67,13 +93,51 @@
 
 .light-icon {
   transition: opacity 0.3s;
+  cursor: pointer;
 }
 
 .brightness-slider {
   touch-action: none; // Prevent page scrolling when sliding on mobile
 }
 
+// Custom color picker styles
 ::ng-deep {
+  .color-picker {
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 1001 !important;
+    
+    .hex-text {
+      .box {
+        padding: 0 8px;
+        border-radius: 4px;
+      }
+    }
+    
+    .type-policy {
+      border-radius: 50%;
+    }
+    
+    .saturation-lightness {
+      border-radius: 8px 8px 0 0;
+      z-index: 2;
+    }
+    
+    .button-area {
+      .btn-cancel {
+        font-size: 12px;
+      }
+      
+      .btn-ok {
+        font-size: 12px;
+        background: #3B82F6;
+        color: white;
+        border-radius: 4px;
+        padding: 4px 8px;
+      }
+    }
+  }
+  
   .mat-slider {
     width: 120px;
     transition: opacity 0.3s;
