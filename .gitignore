@@ -1,2 +1,4 @@
 esp/data/*.json
+smart-home-ui/src/environments/environment.ts
+
 
