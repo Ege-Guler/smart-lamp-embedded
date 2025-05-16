@@ -6,7 +6,11 @@
 #include <PubSubClient.h>
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
+<<<<<<< Updated upstream
 #include <DNSServer.h>
+=======
+#include <Adafruit_NeoPixel.h>
+>>>>>>> Stashed changes
 
 #include "EEPROMHelper.h"
 
@@ -19,7 +23,16 @@
 #define WIFI_TIMEOUT 16000
 #define RESET_BUTTON_PIN 0
 
+<<<<<<< Updated upstream
 const byte DNS_PORT = 53;
+=======
+#define NEOPIXEL_PIN 2 // GPIO2 (D4 on NodeMCU)
+#define RING_LEDS 16
+#define R 0
+#define G 1
+#define B 2
+#define A 3
+>>>>>>> Stashed changes
 
 // Acces Point Configuration
 const char *ssidAP = "h2-smart-lamp";
@@ -61,6 +74,13 @@ struct MQTTConfig mqttConfig;
 
 static bool isSTA;
 
+
+
+
+uint8_t globColor[4] = {0, 0, 0, 0}; // r,g,b,a
+
+Adafruit_NeoPixel strip(RING_LEDS, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
+
 // Function prototypes
 bool loadRootCAFromFS();
 void callback(char *topic, byte *payload, unsigned int length);
@@ -88,7 +108,7 @@ void readMQTTConfig()
     return;
   }
 
-  StaticJsonDocument<512> doc;
+  StaticJsonDocument<256> doc;
   DeserializationError error = deserializeJson(doc, file);
   file.close();
 
@@ -189,7 +209,7 @@ void setupMQTT()
 
   readMQTTConfig();
 
-  client.setBufferSize(1024);
+  client.setBufferSize(512);
   client.setServer(mqttConfig.mqtt_server.c_str(), mqttConfig.mqtt_port);
   client.setCallback(callback);
 }
@@ -433,8 +453,70 @@ void reconnect()
   }
 }
 
+
+/*
+  NeoPixel Functions
+*/
+
+void saveColor(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
+{
+  globColor[R] = r;
+  globColor[G] = g;
+  globColor[B] = b;
+  globColor[A] = a;
+}
+
+// r,g,b,a
+void setColorRgb(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
+{
+  strip.setBrightness(a);
+  saveColor(r, g, b, a);  
+  for (int i = 0; i < strip.numPixels(); i++)
+  {
+    strip.setPixelColor(i, strip.Color(r, g, b));
+  }
+  strip.show();
+}
+
+void restoreColors(){
+  setColorRgb(globColor[R], globColor[G], globColor[B], globColor[A]);
+}
+
+void blinkOnce(int period, bool calledFromblinkN){
+  
+  for (int i = 0; i < strip.numPixels(); i++)
+  {
+    strip.setPixelColor(i, strip.Color(globColor[R], globColor[G], globColor[B]));
+  }
+  strip.show();
+  delay(period);
+  for (int i = 0; i < strip.numPixels(); i++)
+  {
+    strip.setPixelColor(i, strip.Color(0, 0, 0));
+  }
+  strip.show();
+
+  if(!calledFromblinkN) restoreColors;
+}
+
+void blinkN(int n, int period){
+  for (int i = 0; i < n; i++)
+  {
+    blinkOnce(period, true);
+    delay(period);
+  }
+  restoreColors();
+
+}
+
 void setup()
 {
+  strip.begin();
+  strip.show(); // Initialize all pixels to 'off'
+
+  //test neopixel
+  setColorRgb(250, 120, 40, 128);
+
   Serial.begin(115200);
   EEPROM.begin(512); // 512 bytes reserved
   pinMode(LED_BUILTIN, OUTPUT);
