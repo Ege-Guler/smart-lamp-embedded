@@ -6,13 +6,12 @@
 #include <PubSubClient.h>
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
-<<<<<<< Updated upstream
 #include <DNSServer.h>
-=======
 #include <Adafruit_NeoPixel.h>
->>>>>>> Stashed changes
 
 #include "EEPROMHelper.h"
+
+#define INF 99999
 
 #define SSID_ADDR 0
 #define PASSWD_ADDR 32
@@ -23,16 +22,13 @@
 #define WIFI_TIMEOUT 16000
 #define RESET_BUTTON_PIN 0
 
-<<<<<<< Updated upstream
 const byte DNS_PORT = 53;
-=======
-#define NEOPIXEL_PIN 2 // GPIO2 (D4 on NodeMCU)
+#define NEOPIXEL_PIN 5 // GPIO5 (D1 on NodeMCU)
 #define RING_LEDS 16
 #define R 0
 #define G 1
 #define B 2
 #define A 3
->>>>>>> Stashed changes
 
 // Acces Point Configuration
 const char *ssidAP = "h2-smart-lamp";
@@ -190,6 +186,12 @@ void callback(char *topic, byte *payload, unsigned int length)
 {
   Serial.print("Message arrived on topic: ");
   Serial.println(topic);
+
+
+
+  setColorRgb(255, 50, 50, 50);
+  blinkOnce(500, false);
+  publishStatus();
 
   Serial.print("Message: ");
   for (int i = 0; i < length; i++)
@@ -506,16 +508,41 @@ void blinkN(int n, int period){
     delay(period);
   }
   restoreColors();
+}
 
+void blinkAPMode(){
+  blinkOnce(1000, false);
+}
+
+
+double calculatePowerConsumption(){
+  return 0.00;
+}
+
+void publishStatus(){
+  StaticJsonDocument<256> stat;
+
+  stat["device"] = ssidAP;
+  stat["wifi_connected"] = WiFi.SSID().c_str();
+  stat["ip_addr"] = WiFi.localIP().toString();
+  stat["mac_addr"] = WiFi.macAddress().c_str();
+  stat["heap_free"] = ESP.getFreeHeap();
+  stat["rssi"] = WiFi.RSSI();
+  stat["uptime"] = millis() / 1000;
+
+  char stat_payload[256];
+  serializeJson(stat, stat_payload);
+  client.publish("status", stat_payload);
 }
 
 void setup()
 {
   strip.begin();
+  strip.clear();
   strip.show(); // Initialize all pixels to 'off'
 
   //test neopixel
-  setColorRgb(250, 120, 40, 128);
+  //setColorRgb(250, 120, 40, 128);
 
   Serial.begin(115200);
   EEPROM.begin(512); // 512 bytes reserved
