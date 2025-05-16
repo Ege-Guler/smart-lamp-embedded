@@ -12,12 +12,15 @@
 #include "EEPROMHelper.h"
 
 #define INF 99999
+#define S_TO_MS 1000.0
+#define H_TO_S 3600.0
 
 #define SSID_ADDR 0
 #define PASSWD_ADDR 32
 #define MAX_SSID_LEN 32
 #define MAX_PASSWD_LEN 64
 #define MOD_ADDR 128
+#define E_CONSUMPTION_ADDR (MOD_ADDR + sizeof(bool))
 
 #define WIFI_TIMEOUT 16000
 #define RESET_BUTTON_PIN 0
@@ -29,6 +32,8 @@ const byte DNS_PORT = 53;
 #define G 1
 #define B 2
 #define A 3
+
+#define PW_SUPPLY_V 5.00
 
 // Acces Point Configuration
 const char *ssidAP = "h2-smart-lamp";
@@ -70,6 +75,13 @@ struct MQTTConfig mqttConfig;
 
 static bool isSTA;
 
+// Energy Consumption
+
+double energyConsumptionSinceStart = 0.0;
+double energyConsumptionLifeTime = 0.0;
+double lastSavedLifeTimeEnergy = 0.0;
+unsigned long lastEnergyCheck = millis();
+const unsigned long energyCheckIntervalMs = 30000; // 30 seconds
 
 
 
@@ -94,6 +106,13 @@ void blink();
 void reconnect();
 void readMQTTConfig();
 bool syncNTP();
+void loadLifeTimePowerConsumption();
+void saveLifeTimePowerConsumption();
+double calculatePowerDraw();
+void updateEnergyUsage(bool isIntervalBased);
+void publishEnergyUsage();
+void publishStatus();
+
 
 void readMQTTConfig()
 {
@@ -190,8 +209,8 @@ void callback(char *topic, byte *payload, unsigned int length)
 
 
   setColorRgb(255, 50, 50, 50);
-  blinkOnce(500, false);
   publishStatus();
+  publishEnergyUsage();
 
   Serial.print("Message: ");
   for (int i = 0; i < length; i++)
@@ -471,6 +490,7 @@ void saveColor(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
 // r,g,b,a
 void setColorRgb(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
 {
+  updateEnergyUsage(false);
   strip.setBrightness(a);
   saveColor(r, g, b, a);  
   for (int i = 0; i < strip.numPixels(); i++)
@@ -515,9 +535,62 @@ void blinkAPMode(){
 }
 
 
-double calculatePowerConsumption(){
-  return 0.00;
+void loadLifeTimePowerConsumption(){
+  eepromRead(E_CONSUMPTION_ADDR, energyConsumptionLifeTime);
 }
+
+void saveLifeTimePowerConsumption(){
+  const int threshold = 0.01;
+  if(abs(lastSavedLifeTimeEnergy - energyConsumptionLifeTime) < threshold) return;
+
+  eepromWrite(E_CONSUMPTION_ADDR, energyConsumptionLifeTime);
+  lastSavedLifeTimeEnergy = energyConsumptionLifeTime;
+}
+
+double calculatePowerDraw() {
+  double colorFactor = (globColor[R] + globColor[G] + globColor[B]) / 255.0;
+  double brightnessFactor = globColor[A] / 255.0;
+  
+  double current_mA = RING_LEDS * colorFactor * 20.0 * brightnessFactor + RING_LEDS * 1.0;
+  
+  double power_mW = current_mA * PW_SUPPLY_V;
+  return power_mW / 1000.0; // return power in Watts
+}
+
+// if isIntervalBased true, update energy usage by interval length 
+void updateEnergyUsage(bool isIntervalBased){
+
+
+  unsigned long now = millis();
+  unsigned long dt = now - lastEnergyCheck;
+
+  if(isIntervalBased && dt < energyCheckIntervalMs) return;
+
+
+  double w = calculatePowerDraw();
+  double whIncrement = w * (dt / S_TO_MS) / H_TO_S;
+
+  energyConsumptionSinceStart += whIncrement;
+  energyConsumptionLifeTime += whIncrement;
+  saveLifeTimePowerConsumption();
+  
+  lastEnergyCheck = now;
+
+}
+
+void publishEnergyUsage(){
+  StaticJsonDocument<128> energy_stat;
+
+  energy_stat["uptime"] = millis();
+  energy_stat["energy_usage_whr_life_time"] = energyConsumptionLifeTime;
+  energy_stat["energy_usage_whr_since_start"] = energyConsumptionSinceStart;
+
+  char energy_stat_payload[128];
+  serializeJson(energy_stat, energy_stat_payload);
+  client.publish("energy_consumption", energy_stat_payload);
+
+}
+
 
 void publishStatus(){
   StaticJsonDocument<256> stat;
@@ -579,6 +652,8 @@ void loop()
 
   dnsServer.processNextRequest();
   server.handleClient();
+
+  updateEnergyUsage(true);
 
   if (isSTA)
   {
