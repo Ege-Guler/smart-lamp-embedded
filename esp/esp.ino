@@ -11,10 +11,13 @@
 
 #include "EEPROMHelper.h"
 
-#define INF 99999
-#define S_TO_MS 1000.0
-#define H_TO_S 3600.0
 
+#define INF 99999
+#define S_TO_MS 1000.0  // 1 second = 1000 milliseconds
+#define H_TO_S 3600.0   // 1 hour = 3600 seconds
+
+//EEPROM Addresses
+#define EEPROM_SIZE 512
 #define SSID_ADDR 0
 #define PASSWD_ADDR 32
 #define MAX_SSID_LEN 32
@@ -25,7 +28,7 @@
 #define WIFI_TIMEOUT 16000
 #define RESET_BUTTON_PIN 0
 
-const byte DNS_PORT = 53;
+
 #define NEOPIXEL_PIN 5 // GPIO5 (D1 on NodeMCU)
 #define RING_LEDS 16
 #define R 0
@@ -35,11 +38,15 @@ const byte DNS_PORT = 53;
 
 #define PW_SUPPLY_V 5.00
 
+
+
 // Acces Point Configuration
 const char *ssidAP = "h2-smart-lamp";
 const char *passwordAP = "configureme";
 
 IPAddress apIP(172, 217, 28, 1);
+const byte DNS_PORT = 53;
+
 
 bool resetTriggered = false;
 
@@ -51,6 +58,13 @@ struct MQTTConfig
   String mqtt_user;
   String mqtt_pass;
 };
+
+
+const String configTopic = "lamp/config";
+const String requestTopic = "lamp/request";
+const String errorTopic = "lamp/error";
+const String energyTopic = "lamp/energyConsumption";
+const String statusTopic = "lamp/status";
 
 // Struct to hold WiFi credentials
 struct WifiConfig
@@ -112,6 +126,9 @@ double calculatePowerDraw();
 void updateEnergyUsage(bool isIntervalBased);
 void publishEnergyUsage();
 void publishStatus();
+void handleRequest(const String& msg);
+void publishError(const String& error);
+
 
 
 void readMQTTConfig()
@@ -214,20 +231,12 @@ void callback(char *topic, byte *payload, unsigned int length)
   }
 
 
-  if(topicStr == "lamp/config"){
+  if(topicStr == configTopic){
     handleConfig(msg);
   }
-  // else if(topicStr == "lamp/energy"){
-
-  // }
-
-  // else if(topicStr == "lamp/status"){
-
-  // }
-
-  publishStatus();
-  publishEnergyUsage();
-
+  else if(topicStr == requestTopic){
+    handleRequest(msg);
+  }
 }
 
 
@@ -241,8 +250,8 @@ void callback(char *topic, byte *payload, unsigned int length)
 */
 void handleConfig(const String& msg){
   StaticJsonDocument<64> config;
-  DeserializationError err = deserializeJson(config, msg);
-  if (err) {
+  DeserializationError error = deserializeJson(config, msg);
+  if (error) {
     Serial.println("JSON parse failed, cannot configure");
     return;
   }
@@ -256,6 +265,46 @@ void handleConfig(const String& msg){
 
   setColorRgb(r, g, b, a);
 
+}
+
+
+/*
+{
+"type":  "energy_consumption"
+}
+*/
+void handleRequest(const String& msg){
+  StaticJsonDocument<32> req;
+  DeserializationError error = deserializeJson(req, msg);
+  if (error) {
+    Serial.println("JSON parse failed, request is invalid");
+    return;
+  }
+
+  String requestType = req["type"];
+  
+  if(requestType == "energy_consumption"){
+    publishEnergyUsage();
+  }
+
+  else if(requestType == "status"){
+    publishStatus();
+  }
+  else{
+    String err = "Invalid request type.";
+    publishError(err);
+  }
+}
+
+void publishError(const String& error){
+  StaticJsonDocument<128> err;
+  
+  err["time"] = millis();
+  err["error"] = error;
+
+  char err_payload[128];
+  serializeJson(err, err_payload);
+  client.publish(errorTopic.c_str(), err_payload);
 }
 
 void setupMQTT()
@@ -496,7 +545,8 @@ void reconnect()
     Serial.println("Trying to connect to MQTT Broker...");
     if (client.connect("ESP8266Client32", mqttConfig.mqtt_user.c_str(), mqttConfig.mqtt_pass.c_str()))
     {
-      client.subscribe("lamp/config");
+      client.subscribe(configTopic.c_str());
+      client.subscribe(requestTopic.c_str());
       client.subscribe("lamp/test");
       Serial.println("MQTT connected and subscribed.");
     }
@@ -626,10 +676,11 @@ void publishEnergyUsage(){
   energy_stat["uptime"] = millis();
   energy_stat["energy_usage_whr_life_time"] = energyConsumptionLifeTime;
   energy_stat["energy_usage_whr_since_start"] = energyConsumptionSinceStart;
+  energy_stat["wattage"] = calculatePowerDraw();
 
   char energy_stat_payload[128];
   serializeJson(energy_stat, energy_stat_payload);
-  client.publish("energy_consumption", energy_stat_payload);
+  client.publish(energyTopic.c_str(), energy_stat_payload);
 
 }
 
@@ -643,11 +694,11 @@ void publishStatus(){
   stat["mac_addr"] = WiFi.macAddress().c_str();
   stat["heap_free"] = ESP.getFreeHeap();
   stat["rssi"] = WiFi.RSSI();
-  stat["uptime"] = millis() / 1000;
+  stat["uptime"] = millis();
 
   char stat_payload[256];
   serializeJson(stat, stat_payload);
-  client.publish("status", stat_payload);
+  client.publish(statusTopic.c_str(), stat_payload);
 }
 
 void setup()
@@ -657,7 +708,7 @@ void setup()
   strip.show(); // Initialize all pixels to 'off'
 
   Serial.begin(9600);
-  EEPROM.begin(512); // 512 bytes reserved
+  EEPROM.begin(EEPROM_SIZE);
   delay(100);
 
   Serial.println("Setting up...");
