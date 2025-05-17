@@ -203,21 +203,59 @@ bool loadRootCAFromFS()
 
 void callback(char *topic, byte *payload, unsigned int length)
 {
-  Serial.print("Message arrived on topic: ");
-  Serial.println(topic);
+
+  String topicStr = String(topic);
+  Serial.printf("Message arrived on topic: %s", topic);
+  
+  String msg = "";
+
+  for (unsigned int i = 0; i < length; i++){
+    msg += (char)payload[i];
+  }
 
 
+  if(topicStr == "lamp/config"){
+    handleConfig(msg);
+  }
+  // else if(topicStr == "lamp/energy"){
 
-  setColorRgb(255, 50, 50, 50);
+  // }
+
+  // else if(topicStr == "lamp/status"){
+
+  // }
+
   publishStatus();
   publishEnergyUsage();
 
-  Serial.print("Message: ");
-  for (int i = 0; i < length; i++)
-  {
-    Serial.print((char)payload[i]);
+}
+
+
+/*
+{
+  "r": 120,
+  "g": 50,
+  "b": 200,
+  "a": 100
+}
+*/
+void handleConfig(const String& msg){
+  StaticJsonDocument<64> config;
+  DeserializationError err = deserializeJson(config, msg);
+  if (err) {
+    Serial.println("JSON parse failed, cannot configure");
+    return;
   }
-  Serial.println();
+
+  uint8_t r, g, b, a;
+
+  r = config["r"];
+  g = config["g"];
+  b = config["b"];
+  a = config["a"];
+
+  setColorRgb(r, g, b, a);
+
 }
 
 void setupMQTT()
@@ -458,7 +496,8 @@ void reconnect()
     Serial.println("Trying to connect to MQTT Broker...");
     if (client.connect("ESP8266Client32", mqttConfig.mqtt_user.c_str(), mqttConfig.mqtt_pass.c_str()))
     {
-      client.subscribe("test/topic");
+      client.subscribe("lamp/config");
+      client.subscribe("lamp/test");
       Serial.println("MQTT connected and subscribed.");
     }
     else
