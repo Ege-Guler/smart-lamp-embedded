@@ -67,6 +67,7 @@ const String requestTopic = "lamp/request";
 const String errorTopic = "lamp/error";
 const String energyTopic = "lamp/energyConsumption";
 const String statusTopic = "lamp/status";
+const String lwtTopic = "lamp/lwt";
 
 // Struct to hold WiFi credentials
 struct WifiConfig
@@ -303,10 +304,22 @@ void handleRequest(const String& msg){
   else if(requestType == "status"){
     publishStatus();
   }
+  else if(requestType == "reset"){
+    deviceResetHandler();
+  }
   else{
     String err = "Invalid request type.";
     publishError(err);
   }
+}
+
+// Device reset handler
+// Reset all saved data and restart the device
+void deviceResetHandler(){
+  publishError("Device reset requested.");
+  delay(1000);
+  clearEEPROM();
+  ESP.restart();
 }
 
 /*
@@ -362,7 +375,7 @@ String getContentType(String path)
   return "text/plain";
 }
 
-// Captive portal
+// For Captive portal
 // This function handles the file requests from the web server
 void handleFileRequest(String path)
 {
@@ -468,6 +481,35 @@ void startAP()
   Serial.println("AP started. IP: " + WiFi.softAPIP().toString());
 
   server.on("/submit", handleFormSubmit);
+
+  server.on("/generate_204", []()
+            {
+    server.sendHeader("Location", "/");
+    server.send(302, "text/plain", "Redirecting..."); });
+
+  server.on("/fwlink", []()
+            {
+    server.sendHeader("Location", "/");
+    server.send(302, "text/plain", "Redirecting..."); });
+
+  server.on("/hotspot-detect.html", []()
+            {
+    server.sendHeader("Location", "/");
+    server.send(302, "text/plain", "Redirecting..."); });
+  server.on("/connecttest.txt", []()
+            {
+  server.sendHeader("Location", "/");
+  server.send(302, "text/plain", "Redirecting to portal..."); });
+  server.on("/redirect", []()
+            {
+  server.sendHeader("Location", "/");
+  server.send(302, "text/html", "Redirecting..."); });
+
+  server.on("/check_network_status.txt", []()
+            {
+  server.sendHeader("Location", "/");
+  server.send(302, "text/plain", "Redirecting..."); });
+
 
   server.onNotFound([]()
                     {
@@ -579,8 +621,16 @@ void reconnect()
   if (!client.connected())
   {
     Serial.println("Trying to connect to MQTT Broker...");
-    if (client.connect("ESP8266Client32", mqttConfig.mqtt_user.c_str(), mqttConfig.mqtt_pass.c_str()))
+    if (client.connect("ESP8266Client32", mqttConfig.mqtt_user.c_str(), mqttConfig.mqtt_pass.c_str(), lwtTopic.c_str(), 1, true, "{\"status\":\"offline\"}" ))
     {
+
+      //LWT message
+      StaticJsonDocument<32> online;
+      online["status"] = "online";
+      char payload[32];
+      serializeJson(online, payload);
+      client.publish(lwtTopic.c_str(), payload, true);  // retained = true
+
       client.subscribe(configTopic.c_str());
       client.subscribe(requestTopic.c_str());
       client.subscribe("lamp/test");
