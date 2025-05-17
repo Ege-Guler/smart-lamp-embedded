@@ -106,8 +106,8 @@ void blink();
 void reconnect();
 void readMQTTConfig();
 bool syncNTP();
-void loadLifeTimePowerConsumption();
-void saveLifeTimePowerConsumption();
+void loadLifeTimeEnergyConsumption();
+void saveLifeTimeEnergyConsumption();
 double calculatePowerDraw();
 void updateEnergyUsage(bool isIntervalBased);
 void publishEnergyUsage();
@@ -535,12 +535,15 @@ void blinkAPMode(){
 }
 
 
-void loadLifeTimePowerConsumption(){
+void loadLifeTimeEnergyConsumption(){
+
+  Serial.print("Lifetime energy:");
+  Serial.println(energyConsumptionLifeTime);
   eepromRead(E_CONSUMPTION_ADDR, energyConsumptionLifeTime);
 }
 
-void saveLifeTimePowerConsumption(){
-  const int threshold = 0.01;
+void saveLifeTimeEnergyConsumption(){
+  const int threshold = 0.001;
   if(abs(lastSavedLifeTimeEnergy - energyConsumptionLifeTime) < threshold) return;
 
   eepromWrite(E_CONSUMPTION_ADDR, energyConsumptionLifeTime);
@@ -572,7 +575,7 @@ void updateEnergyUsage(bool isIntervalBased){
 
   energyConsumptionSinceStart += whIncrement;
   energyConsumptionLifeTime += whIncrement;
-  saveLifeTimePowerConsumption();
+  saveLifeTimeEnergyConsumption();
   
   lastEnergyCheck = now;
 
@@ -614,11 +617,13 @@ void setup()
   strip.clear();
   strip.show(); // Initialize all pixels to 'off'
 
-  //test neopixel
-  //setColorRgb(250, 120, 40, 128);
-
-  Serial.begin(115200);
+  Serial.begin(9600);
   EEPROM.begin(512); // 512 bytes reserved
+  delay(100);
+
+  Serial.println("Setting up...");
+  loadLifeTimeEnergyConsumption();
+
   pinMode(LED_BUILTIN, OUTPUT);
   blinker.detach();
 
