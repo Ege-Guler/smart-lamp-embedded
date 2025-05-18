@@ -17,9 +17,6 @@ export interface Light {
 export class LightService {
   private lightsSubject = new BehaviorSubject<Light[]>([
     { id: '1', name: 'Living Room Light', location: 'Living Room', color: '#FF4D4F', isOn: true, brightness: 80 },
-    { id: '2', name: 'Bedroom Light', location: 'Bed Room 1', color: '#00C58E', isOn: false, brightness: 60 },
-    { id: '3', name: 'Bathroom Light', location: 'Bathroom', color: '#FACC15', isOn: true, brightness: 100 },
-    { id: '4', name: 'Guest Room Light', location: 'Bed Room 2', color: '#3B82F6', isOn: false, brightness: 40 }
   ]);
 
   lights$: Observable<Light[]> = this.lightsSubject.asObservable();
@@ -47,10 +44,12 @@ export class LightService {
     }));
     this.lightsSubject.next(updatedLights);
 
-    // Publish MQTT message to turn off all lights
-    this.mqttService.publishMessage('lights/all/command', JSON.stringify({ 
-      action: 'turn_off',
-      timestamp: new Date().toISOString()
+    // Send proper RGBA format to lamp/config topic
+    this.mqttService.publishMessage('lamp/config', JSON.stringify({
+      r: 0,
+      g: 0,
+      b: 0,
+      a: 0
     }));
   }
 
@@ -61,13 +60,26 @@ export class LightService {
     );
     this.lightsSubject.next(updatedLights);
 
-    // Publish MQTT message for the specific light
-    this.mqttService.publishMessage(`lights/${updatedLight.id}/command`, JSON.stringify({
-      isOn: updatedLight.isOn,
-      brightness: updatedLight.brightness,
-      color: updatedLight.color,
-      timestamp: new Date().toISOString()
-    }));
+    // Convert hex color to RGB values
+    const rgbColor = this.hexToRgb(updatedLight.color);
+    
+    if (rgbColor && updatedLight.isOn) {
+      // Send RGBA values to the lamp/config topic as specified
+      this.mqttService.publishMessage('lamp/config', JSON.stringify({
+        r: rgbColor.r,
+        g: rgbColor.g,
+        b: rgbColor.b,
+        a: Math.round(updatedLight.brightness * 2.55) // Convert 0-100 to 0-255
+      }));
+    } else if (!updatedLight.isOn) {
+      // Turn off the light by setting brightness to 0
+      this.mqttService.publishMessage('lamp/config', JSON.stringify({
+        r: 0,
+        g: 0,
+        b: 0,
+        a: 0
+      }));
+    }
   }
 
   // Convert hex color to RGB values for MQTT
