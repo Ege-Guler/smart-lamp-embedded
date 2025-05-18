@@ -6,7 +6,6 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MqttClientService } from '../../services/mqtt.service';
 import { DeviceStatusService, DeviceStatus } from '../../services/device-status.service';
 import { Subscription, interval } from 'rxjs';
-import { DatePipe } from '@angular/common';
 
 @Component({
   selector: 'app-running-status',
@@ -15,8 +14,7 @@ import { DatePipe } from '@angular/common';
     CommonModule,
     MatCardModule,
     MatIconModule,
-    MatTooltipModule,
-    DatePipe
+    MatTooltipModule
   ],
   templateUrl: './running-status.component.html',
   styleUrls: ['./running-status.component.scss']

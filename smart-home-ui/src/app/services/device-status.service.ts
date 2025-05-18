@@ -36,7 +36,11 @@ export class DeviceStatusService implements OnDestroy {
     );
     
     // Request device status initially and then every 30 seconds
-    this.requestDeviceStatus();
+    // Wait a short time to ensure MQTT connection is established
+    setTimeout(() => {
+      this.requestDeviceStatus();
+    }, 1000);
+    
     this.subscriptions.push(
       interval(30000).subscribe(() => {
         this.requestDeviceStatus();
