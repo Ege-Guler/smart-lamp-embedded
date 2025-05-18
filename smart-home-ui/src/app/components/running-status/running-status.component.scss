@@ -41,6 +41,10 @@
   color: #FF4D4F;
 }
 
+.status-value.warning {
+  color: #FACC15;
+}
+
 .icon-online {
   color: #10B981;
 }
@@ -51,4 +55,24 @@
 
 .icon-warning {
   color: #FACC15;
+}
+
+.device-status-subtitle {
+  margin-top: 24px;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #4B5563;
+  padding-left: 8px;
+  border-left: 3px solid #10B981;
+}
+
+/* Blinking animation for RSSI icon */
+@keyframes blink {
+  0% { opacity: 1; }
+  50% { opacity: 0.4; }
+  100% { opacity: 1; }
+}
+
+.blink-icon {
+  animation: blink 1.5s infinite ease-in-out;
 }

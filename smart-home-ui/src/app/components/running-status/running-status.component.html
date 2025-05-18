@@ -4,7 +4,21 @@
   </mat-card-header>
   <mat-card-content>
     <div class="status-grid">
-      <div class="status-item" *ngFor="let status of statusItems">
+      <div class="status-item" *ngFor="let status of connectionStatusItems">
+        <mat-icon [class]="status.iconClass" [matTooltip]="status.tooltip">
+          {{ status.icon }}
+        </mat-icon>
+        <span class="status-label">{{ status.label }}</span>
+        <span class="status-value" [class]="status.valueClass">
+          {{ status.value }}
+        </span>
+      </div>
+    </div>
+    
+    <mat-card-subtitle class="device-status-subtitle">Device Information</mat-card-subtitle>
+    
+    <div class="status-grid">
+      <div class="status-item" *ngFor="let status of deviceStatusItems">
         <mat-icon [class]="status.iconClass" [matTooltip]="status.tooltip">
           {{ status.icon }}
         </mat-icon>
