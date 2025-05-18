@@ -5,6 +5,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { LightService, Light } from '../../services/light.service';
+import { MqttClientService } from '../../services/mqtt.service';
 
 @Component({
   selector: 'app-quick-actions',
@@ -44,6 +45,12 @@ export class QuickActionsComponent {
       label: 'All Off',
       color: '#FF4D4F',
       tooltip: 'Turn off all lights'
+    },
+    {
+      icon: 'restart_alt',
+      label: 'Reset',
+      color: '#F59E0B',
+      tooltip: 'Reset the lamp'
     }
   ];
 
@@ -68,6 +75,7 @@ export class QuickActionsComponent {
 
   constructor(
     private lightService: LightService,
+    private mqttService: MqttClientService,
     private renderer: Renderer2,
     private el: ElementRef
   ) {
@@ -80,7 +88,7 @@ export class QuickActionsComponent {
   onActionClick(action: any): void {
     console.log('Action clicked:', action.label);
     
-    if (this.currentLights.length === 0) return;
+    if (this.currentLights.length === 0 && action.label !== 'Reset') return;
     
     // We have only one light now (Living Room Light)
     const light = this.currentLights[0];
@@ -97,6 +105,9 @@ export class QuickActionsComponent {
         break;
       case 'All Off':
         this.lightService.turnOffAllLights();
+        break;
+      case 'Reset':
+        this.resetLamp();
         break;
     }
     
@@ -121,5 +132,13 @@ export class QuickActionsComponent {
     };
     
     this.lightService.updateLight(updatedLight);
+  }
+  
+  private resetLamp(): void {
+    // Send reset command to lamp/request topic
+    this.mqttService.publishMessage('lamp/request', JSON.stringify({
+      type: 'reset'
+    }));
+    console.log('Reset command sent to lamp');
   }
 }
