@@ -1,0 +1,31 @@
+Primary Colors (used for cards, charts, buttons)
+------------------------------------------------
+Red (Living Room):     #FF4D4F
+Green (Bed Room 1):    #00C58E
+Yellow (Bathroom):     #FACC15
+Blue (Bed Room 2):     #3B82F6
+Orange (Chart bars):   #FFB020
+Pink (Chart bar):      #FF3D71
+
+Neutral Colors (background, text, toggles)
+------------------------------------------
+Background:            #F9FAFB
+Card/Panel Border:     #E5E7EB
+Text Primary:          #111827
+Text Secondary:        #6B7280
+Toggle Off:            #D1D5DB
+Toggle On (Blue):      #3B82F6
+
+Icon Colors
+-----------
+Sun (Morning):         #FACC15
+Moon (Night):          #9CA3AF
+Work/Leaf:             #10B981
+Add/Plus Button:       #3B82F6
+
+Design Style Summary
+--------------------
+- Flat & Modern (Material Design style)
+- Rounded Corners
+- Bright Accent Colors
+- Subtle Shadows on Actions

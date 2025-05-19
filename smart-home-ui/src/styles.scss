@@ -1,1 +1,59 @@
 /* You can add global styles to this file, and also import other style files */
+
+// Shared Color Palette
+$red: #FF4D4F;
+$green: #00C58E;
+$yellow: #FACC15;
+$blue: #3B82F6;
+$orange: #FFB020;
+$pink: #FF3D71;
+$background: #F9FAFB;
+$panel-border: #E5E7EB;
+$text-primary: #111827;
+$text-secondary: #6B7280;
+$toggle-off: #D1D5DB;
+$night-icon: #9CA3AF;
+$work-icon: #10B981;
+
+.dashboard-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+  padding: 24px;
+  background-color: $background;
+  min-height: 100vh;
+}
+
+html, body { height: 100%; }
+body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+
+// Force repaint class
+.force-repaint {
+  transform: translateZ(0);
+  animation-duration: 0.001s;
+  animation-name: force-repaint;
+}
+
+@keyframes force-repaint {
+  from { opacity: 0.99; }
+  to { opacity: 1; }
+}
+
+// PrimeNG global overrides
+.p-dialog {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+  background-color: white !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}
+
+.p-dialog .p-dialog-header, 
+.p-dialog .p-dialog-content, 
+.p-dialog .p-dialog-footer {
+  background-color: white !important;
+  opacity: 1 !important;
+}
+
+.p-dialog-mask.p-component-overlay {
+  background-color: rgba(0, 0, 0, 0.6) !important;
+}

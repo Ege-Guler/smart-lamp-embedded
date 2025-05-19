@@ -1,7 +1,4 @@
 esp/data/*.json
-<<<<<<< Updated upstream
-=======
 smart-home-ui/src/environments/environment.ts
 .vscode/
->>>>>>> Stashed changes
 
