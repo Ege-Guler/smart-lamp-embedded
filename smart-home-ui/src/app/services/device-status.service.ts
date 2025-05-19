@@ -53,6 +53,30 @@ export class DeviceStatusService implements OnDestroy {
     this.subscriptions.forEach(sub => sub.unsubscribe());
   }
   
+  // Public method to refresh device status
+  refreshDeviceStatus(): void {
+    this.requestDeviceStatus();
+  }
+  
+  // Reset device status to unknown values
+  resetDeviceStatus(): void {
+    const defaultStatus: DeviceStatus = {
+      device: 'Unknown',
+      wifi_connected: 'Not Connected',
+      ip_addr: 'Unknown',
+      mac_addr: 'Unknown',
+      heap_free: 0,
+      rssi: 0,
+      uptime: 0
+    };
+    
+    // Update with default values
+    this.deviceStatusSubject.next(defaultStatus);
+    
+    // Then request fresh data
+    this.requestDeviceStatus();
+  }
+  
   private requestDeviceStatus(): void {
     // Send status request to lamp/request topic
     this.mqttService.publishMessage('lamp/request', JSON.stringify({

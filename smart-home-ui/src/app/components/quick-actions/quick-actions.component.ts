@@ -6,6 +6,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { LightService, Light } from '../../services/light.service';
 import { MqttClientService } from '../../services/mqtt.service';
+import { DeviceStatusService } from '../../services/device-status.service';
+import { EnergyConsumptionService } from '../../services/energy-consumption.service';
 
 @Component({
   selector: 'app-quick-actions',
@@ -76,6 +78,8 @@ export class QuickActionsComponent {
   constructor(
     private lightService: LightService,
     private mqttService: MqttClientService,
+    private deviceStatusService: DeviceStatusService,
+    private energyConsumptionService: EnergyConsumptionService,
     private renderer: Renderer2,
     private el: ElementRef
   ) {
@@ -139,6 +143,26 @@ export class QuickActionsComponent {
     this.mqttService.publishMessage('lamp/request', JSON.stringify({
       type: 'reset'
     }));
-    console.log('Reset command sent to lamp');
+    
+    // Reset the UI values for light
+    if (this.currentLights.length > 0) {
+      const defaultLight: Light = {
+        ...this.currentLights[0],
+        color: '#FFFFFF',  // Default white color
+        brightness: 50,    // Default 50% brightness
+        isOn: true         // Turn light on by default
+      };
+      
+      // Update the light in the service to reflect in UI
+      this.lightService.updateLight(defaultLight);
+    }
+    
+    // Reset device status to unknown values
+    this.deviceStatusService.resetDeviceStatus();
+    
+    // Reset energy consumption data to default values
+    this.energyConsumptionService.resetEnergyData();
+    
+    console.log('Reset command sent to lamp and all UI values reset to defaults');
   }
 }
