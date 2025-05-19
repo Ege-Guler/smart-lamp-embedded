@@ -6,22 +6,49 @@
 #include <PubSubClient.h>
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
+#include <DNSServer.h>
+#include <Adafruit_NeoPixel.h>
 
 #include "EEPROMHelper.h"
 
+
+#define INF 99999
+#define S_TO_MS 1000.0  // 1 second = 1000 milliseconds
+#define H_TO_S 3600.0   // 1 hour = 3600 seconds
+
+//EEPROM Addresses
+#define EEPROM_SIZE 512
 #define SSID_ADDR 0
 #define PASSWD_ADDR 32
 #define MAX_SSID_LEN 32
 #define MAX_PASSWD_LEN 64
 #define MOD_ADDR 128
+#define E_CONSUMPTION_ADDR (MOD_ADDR + sizeof(bool))
 
 #define WIFI_TIMEOUT 16000
 #define RESET_BUTTON_PIN 0
+
+
+// NeoPixel Configuration
+#define NEOPIXEL_PIN 5 // GPIO5 (D1 on NodeMCU)
+#define RING_LEDS 16
+#define R 0
+#define G 1
+#define B 2
+#define A 3
+
+#define PW_SUPPLY_V 5.00
+
+
 
 // Acces Point Configuration
 const char *ssidAP = "h2-smart-lamp";
 const char *passwordAP = "configureme";
 
+IPAddress apIP(172, 217, 28, 1);
+const byte DNS_PORT = 53;
+
+// LED Configuration
 bool resetTriggered = false;
 
 // Struct to hold MQTT configuration
@@ -32,6 +59,15 @@ struct MQTTConfig
   String mqtt_user;
   String mqtt_pass;
 };
+
+
+// MQTT Topics
+const String configTopic = "lamp/config";
+const String requestTopic = "lamp/request";
+const String errorTopic = "lamp/error";
+const String energyTopic = "lamp/energyConsumption";
+const String statusTopic = "lamp/status";
+const String lwtTopic = "lamp/lwt";
 
 // Struct to hold WiFi credentials
 struct WifiConfig
@@ -47,12 +83,28 @@ Ticker blinker;
 WiFiClientSecure espClient;
 PubSubClient client(espClient);
 
+DNSServer dnsServer;
+
 static BearSSL::X509List *globalRootCert = nullptr;
 
 struct WifiConfig config;
 struct MQTTConfig mqttConfig;
 
+// esp mode
+// true STA, false AP
 static bool isSTA;
+
+// Energy Consumption
+double energyConsumptionSinceStart = 0.0;
+double energyConsumptionLifeTime = 0.0;
+double lastSavedLifeTimeEnergy = 0.0;
+unsigned long lastEnergyCheck = millis();
+const unsigned long energyCheckIntervalMs = 30000; // 30 seconds
+
+// LED Color
+uint8_t globColor[4] = {0, 0, 0, 0}; // r,g,b,a
+
+Adafruit_NeoPixel strip(RING_LEDS, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
 // Function prototypes
 bool loadRootCAFromFS();
@@ -71,19 +123,39 @@ void blink();
 void reconnect();
 void readMQTTConfig();
 bool syncNTP();
+void loadLifeTimeEnergyConsumption();
+void saveLifeTimeEnergyConsumption();
+double calculatePowerDraw();
+void updateEnergyUsage(bool isIntervalBased);
+void publishEnergyUsage();
+void publishStatus();
+void handleRequest(const String& msg);
+void handleConfig(const String& msg);
+void publishError(const String& error);
+void saveColor(uint8_t r, uint8_t g, uint8_t b, uint8_t a);
+void setColorRgb(uint8_t r, uint8_t g, uint8_t b, uint8_t a);
+void restoreColors();
+void blinkOnce(int period, bool calledFromblinkN);
+void blinkN(int n, int period);
 
-void readMQTTConfig(){
+
+
+
+void readMQTTConfig()
+{
   File file = LittleFS.open("/mqtt.json", "r");
-  if(!file){
+  if (!file)
+  {
     Serial.println("Failed to open mqtt.json");
     return;
   }
 
-  StaticJsonDocument<512> doc;
+  StaticJsonDocument<256> doc;
   DeserializationError error = deserializeJson(doc, file);
   file.close();
 
-  if (error) {
+  if (error)
+  {
     Serial.println("Failed to parse config file");
     return;
   }
@@ -93,7 +165,6 @@ void readMQTTConfig(){
   mqttConfig.mqtt_pass = doc["mqtt_password"].as<String>();
 
   Serial.println("MQTT Config loaded successfully.");
-
 }
 
 bool loadRootCAFromFS()
@@ -159,17 +230,117 @@ bool loadRootCAFromFS()
 
 void callback(char *topic, byte *payload, unsigned int length)
 {
-  Serial.print("Message arrived on topic: ");
-  Serial.println(topic);
 
-  Serial.print("Message: ");
-  for (int i = 0; i < length; i++)
-  {
-    Serial.print((char)payload[i]);
+  String topicStr = String(topic);
+  Serial.printf("Message arrived on topic: %s", topic);
+  
+  String msg = "";
+
+  for (unsigned int i = 0; i < length; i++){
+    msg += (char)payload[i];
   }
-  Serial.println();
+
+
+  if(topicStr == configTopic){
+    handleConfig(msg);
+  }
+  else if(topicStr == requestTopic){
+    handleRequest(msg);
+  }
 }
 
+
+/*
+{
+  "r": 120,
+  "g": 50,
+  "b": 200,
+  "a": 100
+}
+*/
+void handleConfig(const String& msg){
+  StaticJsonDocument<64> config;
+  DeserializationError error = deserializeJson(config, msg);
+  if (error) {
+    Serial.println("JSON parse failed, cannot configure");
+    return;
+  }
+
+  uint8_t r, g, b, a;
+
+  r = config["r"];
+  g = config["g"];
+  b = config["b"];
+  a = config["a"];
+
+  setColorRgb(r, g, b, a);
+
+}
+
+
+/*
+{
+"type":  "energy_consumption"
+}
+
+Available types:
+- energy_consumption
+- status
+*/
+void handleRequest(const String& msg){
+  StaticJsonDocument<32> req;
+  DeserializationError error = deserializeJson(req, msg);
+  if (error) {
+    Serial.println("JSON parse failed, request is invalid");
+    return;
+  }
+
+  String requestType = req["type"];
+  
+  if(requestType == "energy_consumption"){
+    publishEnergyUsage();
+  }
+
+  else if(requestType == "status"){
+    publishStatus();
+  }
+  else if(requestType == "reset"){
+    deviceResetHandler();
+  }
+  else{
+    String err = "Invalid request type.";
+    publishError(err);
+  }
+}
+
+// Device reset handler
+// Reset all saved data and restart the device
+void deviceResetHandler(){
+  publishError("Device reset requested.");
+  delay(1000);
+  clearEEPROM();
+  ESP.restart();
+}
+
+/*
+{
+  "time": 123456789,
+  "error": "Error message"
+}
+*/
+// Error message should be short, otherwise it will be cut off
+void publishError(const String& error){
+  StaticJsonDocument<128> err;
+  
+  err["time"] = millis();
+  err["error"] = error;
+
+  char err_payload[128];
+  serializeJson(err, err_payload);
+  client.publish(errorTopic.c_str(), err_payload);
+}
+
+// MQTT setup
 void setupMQTT()
 {
   if (!loadRootCAFromFS())
@@ -180,11 +351,32 @@ void setupMQTT()
 
   readMQTTConfig();
 
-  client.setBufferSize(1024);
+  client.setBufferSize(512);
   client.setServer(mqttConfig.mqtt_server.c_str(), mqttConfig.mqtt_port);
   client.setCallback(callback);
 }
 
+
+// helper function to get the content type based on file extension
+String getContentType(String path)
+{
+  if (path.endsWith(".html"))
+    return "text/html";
+  if (path.endsWith(".css"))
+    return "text/css";
+  if (path.endsWith(".js"))
+    return "application/javascript";
+  if (path.endsWith(".png"))
+    return "image/png";
+  if (path.endsWith(".jpg") || path.endsWith(".jpeg"))
+    return "image/jpeg";
+  if (path.endsWith(".ico"))
+    return "image/x-icon";
+  return "text/plain";
+}
+
+// For Captive portal
+// This function handles the file requests from the web server
 void handleFileRequest(String path)
 {
   if (path.endsWith("/"))
@@ -202,6 +394,7 @@ void handleFileRequest(String path)
   file.close();
 }
 
+// This function handles the form submission from the web server
 void handleFormSubmit()
 {
 
@@ -251,7 +444,8 @@ void setMode(String mode)
 }
 
 // true STA, false AP
-bool loadMode(){
+bool loadMode()
+{
   bool mode;
   eepromRead(MOD_ADDR, mode);
   return mode;
@@ -273,40 +467,71 @@ void loadCredentials()
   Serial.printf("Load Complete | SSID %s, PASSWD %s", config.ssid, config.password);
 }
 
-String getContentType(String path)
-{
-  if (path.endsWith(".html"))
-    return "text/html";
-  if (path.endsWith(".css"))
-    return "text/css";
-  if (path.endsWith(".js"))
-    return "application/javascript";
-  if (path.endsWith(".png"))
-    return "image/png";
-  if (path.endsWith(".jpg") || path.endsWith(".jpeg"))
-    return "image/jpeg";
-  if (path.endsWith(".ico"))
-    return "image/x-icon";
-  return "text/plain";
-}
 
+
+// Start Access Point
+// This function sets up the access point and starts the web server
 void startAP()
 {
+  WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
   WiFi.softAP(ssidAP, passwordAP);
+  dnsServer.start(DNS_PORT, "*", apIP);
   blinker.attach(0.5, blink);
 
   Serial.println("AP started. IP: " + WiFi.softAPIP().toString());
 
   server.on("/submit", handleFormSubmit);
 
+  server.on("/generate_204", []()
+            {
+    server.sendHeader("Location", "/");
+    server.send(302, "text/plain", "Redirecting..."); });
+
+  server.on("/fwlink", []()
+            {
+    server.sendHeader("Location", "/");
+    server.send(302, "text/plain", "Redirecting..."); });
+
+  server.on("/hotspot-detect.html", []()
+            {
+    server.sendHeader("Location", "/");
+    server.send(302, "text/plain", "Redirecting..."); });
+  server.on("/connecttest.txt", []()
+            {
+  server.sendHeader("Location", "/");
+  server.send(302, "text/plain", "Redirecting to portal..."); });
+  server.on("/redirect", []()
+            {
+  server.sendHeader("Location", "/");
+  server.send(302, "text/html", "Redirecting..."); });
+
+  server.on("/check_network_status.txt", []()
+            {
+  server.sendHeader("Location", "/");
+  server.send(302, "text/plain", "Redirecting..."); });
+
+
   server.onNotFound([]()
-                    { handleFileRequest(server.uri()); });
+                    {
+  String path = server.uri();
+  if (LittleFS.exists(path)) {
+    handleFileRequest(path);
+  } else {
+    if (LittleFS.exists("/index.html")) {
+      handleFileRequest("/index.html");
+    } else {
+      server.send(200, "text/html", "<html><body><h1>Welcome</h1><p>Captive portal fallback page.</p></body></html>");
+    }
+  } });
 
   server.begin();
   Serial.println("HTTP server started (AP mode only)");
 }
 
-bool syncNTP(){
+// Sync time with NTP server
+// Required for MQTT certificate verification
+bool syncNTP()
+{
   configTime(0, 0, "pool.ntp.org", "time.nist.gov"); // UTC, no DST, NTP servers
   Serial.print("Waiting for NTP time sync... ");
   time_t now = time(nullptr);
@@ -326,7 +551,8 @@ bool syncNTP(){
   return true;
 }
 
-
+// This function handles the connection loop for WiFi
+// It attempts to connect to the specified WiFi network and syncs time with NTP
 void connectionLoop()
 {
   WiFi.hostname(ssidAP);
@@ -346,8 +572,9 @@ void connectionLoop()
   if (WiFi.status() == WL_CONNECTED)
   {
     Serial.println("\nConnected! IP: " + WiFi.localIP().toString());
-    
-    if(!syncNTP()){
+
+    if (!syncNTP())
+    {
       Serial.println("NTP sync failed.");
       return;
     }
@@ -372,11 +599,16 @@ void clearEEPROM()
   EEPROM.commit();
 }
 
+// Blink the built-in LED
+// This function toggles the state of the built-in LED when esp is in ap mode
+// Attached to a Ticker
 void blink()
 {
   digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
 }
 
+
+// This function handles the reconnection to the MQTT broker in case of disconnection
 void reconnect()
 {
   if (WiFi.status() != WL_CONNECTED)
@@ -389,9 +621,19 @@ void reconnect()
   if (!client.connected())
   {
     Serial.println("Trying to connect to MQTT Broker...");
-    if (client.connect("ESP8266Client32", mqttConfig.mqtt_user.c_str(), mqttConfig.mqtt_pass.c_str()))
+    if (client.connect("ESP8266Client32", mqttConfig.mqtt_user.c_str(), mqttConfig.mqtt_pass.c_str(), lwtTopic.c_str(), 1, true, "{\"status\":\"offline\"}" ))
     {
-      client.subscribe("test/topic");
+
+      //LWT message
+      StaticJsonDocument<32> online;
+      online["status"] = "online";
+      char payload[32];
+      serializeJson(online, payload);
+      client.publish(lwtTopic.c_str(), payload, true);  // retained = true
+
+      client.subscribe(configTopic.c_str());
+      client.subscribe(requestTopic.c_str());
+      client.subscribe("lamp/test");
       Serial.println("MQTT connected and subscribed.");
     }
     else
@@ -407,10 +649,165 @@ void reconnect()
   }
 }
 
+
+/*
+  NeoPixel Functions
+*/
+
+void saveColor(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
+{
+  globColor[R] = r;
+  globColor[G] = g;
+  globColor[B] = b;
+  globColor[A] = a;
+}
+
+// r,g,b,a
+void setColorRgb(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
+{
+  updateEnergyUsage(false);
+  strip.setBrightness(a);
+  saveColor(r, g, b, a);  
+  for (int i = 0; i < strip.numPixels(); i++)
+  {
+    strip.setPixelColor(i, strip.Color(r, g, b));
+  }
+  strip.show();
+}
+
+void restoreColors(){
+  setColorRgb(globColor[R], globColor[G], globColor[B], globColor[A]);
+}
+
+void blinkOnce(int period, bool calledFromblinkN){
+  
+  for (int i = 0; i < strip.numPixels(); i++)
+  {
+    strip.setPixelColor(i, strip.Color(globColor[R], globColor[G], globColor[B]));
+  }
+  strip.show();
+  delay(period);
+  for (int i = 0; i < strip.numPixels(); i++)
+  {
+    strip.setPixelColor(i, strip.Color(0, 0, 0));
+  }
+  strip.show();
+
+  if(!calledFromblinkN) restoreColors;
+}
+
+void blinkN(int n, int period){
+  for (int i = 0; i < n; i++)
+  {
+    blinkOnce(period, true);
+    delay(period);
+  }
+  restoreColors();
+}
+
+// Load lifetime energy consumption from EEPROM
+void loadLifeTimeEnergyConsumption(){
+
+  Serial.print("Lifetime energy:");
+  Serial.println(energyConsumptionLifeTime);
+  eepromRead(E_CONSUMPTION_ADDR, energyConsumptionLifeTime);
+}
+
+// Save lifetime energy consumption to EEPROM
+void saveLifeTimeEnergyConsumption(){
+  const int threshold = 0.001;
+  if(abs(lastSavedLifeTimeEnergy - energyConsumptionLifeTime) < threshold) return;
+
+  eepromWrite(E_CONSUMPTION_ADDR, energyConsumptionLifeTime);
+  lastSavedLifeTimeEnergy = energyConsumptionLifeTime;
+}
+
+// Wattage calculation
+// Each color assumed to draw 20mA based on the bit value
+// 0-255, 0-100% brightness
+// 1.0mA for each LED on idle
+// returns in Watts
+// Power supply voltage is 5V
+double calculatePowerDraw() {
+  double colorFactor = (globColor[R] + globColor[G] + globColor[B]) / 255.0;
+  double brightnessFactor = globColor[A] / 255.0;
+  
+  double current_mA = RING_LEDS * colorFactor * 20.0 * brightnessFactor + RING_LEDS * 1.0;
+  
+  double power_mW = current_mA * PW_SUPPLY_V;
+  return power_mW / 1000.0; // return power in Watts
+}
+
+// if isIntervalBased true, update energy usage by interval length 
+void updateEnergyUsage(bool isIntervalBased){
+
+  unsigned long now = millis();
+  unsigned long dt = now - lastEnergyCheck;
+
+  if(isIntervalBased && dt < energyCheckIntervalMs) return;
+
+
+  double w = calculatePowerDraw();
+  double whIncrement = w * (dt / S_TO_MS) / H_TO_S;
+
+  energyConsumptionSinceStart += whIncrement;
+  energyConsumptionLifeTime += whIncrement;
+  saveLifeTimeEnergyConsumption();
+  
+  lastEnergyCheck = now;
+
+}
+
+
+// Publish energy usage to MQTT
+// Energy usage is in Wh
+void publishEnergyUsage(){
+  StaticJsonDocument<128> energy_stat;
+
+  energy_stat["uptime"] = millis();
+  energy_stat["energy_usage_whr_life_time"] = energyConsumptionLifeTime;
+  energy_stat["energy_usage_whr_since_start"] = energyConsumptionSinceStart;
+  energy_stat["wattage"] = calculatePowerDraw();
+
+  char energy_stat_payload[128];
+  serializeJson(energy_stat, energy_stat_payload);
+  client.publish(energyTopic.c_str(), energy_stat_payload);
+
+}
+
+// Publish status to MQTT
+// Status includes device name, wifi status, IP address, MAC address, free heap memory, RSSI, and uptime
+void publishStatus(){
+  StaticJsonDocument<256> stat;
+
+  stat["device"] = ssidAP;
+  stat["wifi_connected"] = WiFi.SSID().c_str();
+  stat["ip_addr"] = WiFi.localIP().toString();
+  stat["mac_addr"] = WiFi.macAddress().c_str();
+  stat["heap_free"] = ESP.getFreeHeap();
+  stat["rssi"] = WiFi.RSSI();
+  stat["uptime"] = millis();
+
+  char stat_payload[256];
+  serializeJson(stat, stat_payload);
+  client.publish(statusTopic.c_str(), stat_payload);
+}
+
 void setup()
 {
-  Serial.begin(115200);
-  EEPROM.begin(512); // 512 bytes reserved
+  strip.begin();
+  strip.clear();
+  strip.show(); // Initialize all pixels to 'off'
+
+  Serial.begin(9600);
+  EEPROM.begin(EEPROM_SIZE);
+  delay(100);
+
+  Serial.println("Setting up...");
+
+  // Load lifetime energy consumption from EEPROM
+  loadLifeTimeEnergyConsumption();
+
   pinMode(LED_BUILTIN, OUTPUT);
   blinker.detach();
 
@@ -442,7 +839,10 @@ void setup()
 void loop()
 {
 
+  dnsServer.processNextRequest();
   server.handleClient();
+
+  updateEnergyUsage(true);
 
   if (isSTA)
   {
