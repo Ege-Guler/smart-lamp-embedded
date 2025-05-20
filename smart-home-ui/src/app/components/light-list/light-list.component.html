@@ -35,6 +35,14 @@
           <div class="brightness-indicator" [style.color]="light.isOn ? light.color : '#6B7280'">
             {{ light.brightness }}%
           </div>
+          <!-- AI Suggestion Start -->
+          <div *ngIf="light.isOn && getLearnedBrightnessForLight(light.id) !== null" class="learned-suggestion">
+            <span class="suggestion-text">Auto: {{ getLearnedBrightnessForLight(light.id) }}%</span>
+            <button mat-icon-button (click)="applyLearnedBrightness(light)" title="Apply learned brightness">
+              <mat-icon>auto_awesome</mat-icon>
+            </button>
+          </div>
+          <!-- AI Suggestion End -->
           <mat-slide-toggle
             name="toggle-{{light.id}}"
             [(ngModel)]="light.isOn"
