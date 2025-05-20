@@ -27,6 +27,7 @@ export class LightListComponent implements OnInit {
   lights: Light[] = [];
   displayColorPicker = false;
   selectedLight: Light | null = null;
+  learnedBrightnessMap: Map<string, number | null> = new Map();
   
   constructor(
     private lightService: LightService
@@ -35,6 +36,10 @@ export class LightListComponent implements OnInit {
   ngOnInit() {
     this.lightService.lights$.subscribe(lights => {
       this.lights = lights;
+      this.lights.forEach(light => {
+        const learned = this.lightService.getLearnedBrightness(light.id);
+        this.learnedBrightnessMap.set(light.id, learned);
+      });
       setTimeout(() => {}, 0); // Defer change detection to the next event loop
     });
   }
@@ -70,7 +75,12 @@ export class LightListComponent implements OnInit {
     const updatedLight = { ...light };
     this.lightService.updateLight(updatedLight);
     console.log(`${light.name} brightness changed to ${light.brightness}`);
-    
+    // After manual change, re-fetch (or clear) learned brightness for this light,
+    // as the user has just provided a new preference.
+    // Or, the service already updated it, so we might want to update our map.
+    const learned = this.lightService.getLearnedBrightness(light.id); // Re-fetch to get the latest average
+    this.learnedBrightnessMap.set(light.id, learned);
+
     // Provide minimal tactile feedback on slider change completion
     if (window.navigator && window.navigator.vibrate) {
       window.navigator.vibrate(10); // Very short vibration for subtle feedback
@@ -93,7 +103,10 @@ export class LightListComponent implements OnInit {
       const updatedLight = { ...this.selectedLight, color: color };
       this.lightService.updateLight(updatedLight);
       console.log(`${this.selectedLight.name} color changed to ${color}`);
-      
+      // If brightness was also part of a "scene" with color, this might be a place
+      // to also record/update brightness preference if it changed implicitly.
+      // For now, only explicit brightness changes are recorded by the service.
+
       // Provide tactile feedback if available
       if (window.navigator && window.navigator.vibrate) {
         window.navigator.vibrate(20); // Short vibration for feedback
@@ -113,5 +126,27 @@ export class LightListComponent implements OnInit {
     if (brightnessPercent < 0.6) return '#FCD34D';
     if (brightnessPercent < 0.9) return '#F59E0B';
     return '#FBBF24';
+  }
+
+  applyLearnedBrightness(light: Light): void {
+    const learnedBrightness = this.learnedBrightnessMap.get(light.id);
+    if (learnedBrightness !== null && learnedBrightness !== undefined) {
+      const updatedLight = { ...light, brightness: learnedBrightness, isOn: true }; // Also ensure light is on
+      this.lightService.updateLight(updatedLight);
+      // Optionally, provide feedback
+      console.log(`Applied learned brightness ${learnedBrightness}% to ${light.name}`);
+      // Re-fetch and update the map in case the average calculation changes subtly or to confirm
+      const newLearned = this.lightService.getLearnedBrightness(light.id);
+      this.learnedBrightnessMap.set(light.id, newLearned);
+
+      if (window.navigator && window.navigator.vibrate) {
+        window.navigator.vibrate(20);
+      }
+    }
+  }
+
+  // Helper to get the learned brightness for the template
+  getLearnedBrightnessForLight(lightId: string): number | null {
+    return this.learnedBrightnessMap.get(lightId) ?? null;
   }
 }
